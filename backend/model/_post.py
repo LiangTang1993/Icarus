@@ -3,11 +3,13 @@
 """
 一些通用类的定义
 """
+import time
 from abc import abstractmethod
 from typing import Dict, Type, Optional
 
 from peewee import *
-from slim.base.sqlquery import DataRecord
+
+import config
 
 from config import POST_ID_GENERATOR
 from slim.utils import get_bytes_from_blob
@@ -63,34 +65,34 @@ class POST_TYPES(StateObject):
 
     @classmethod
     def get_model(cls, related_type) -> Type['PostModel']:
-        from model.user import User
-        from model.topic import Topic
-        from model.comment import Comment
-        from model.board import Board
-        from model.wiki import WikiArticle
+        from model.user_model import UserModel
+        from model.topic_model import TopicModel
+        from model.comment_model import CommentModel
+        from model.board_model import BoardModel
+        from model.wiki import WikiArticleModel
         from model.mention import Mention
 
         if isinstance(related_type, str):
             related_type = int(related_type)
 
         if related_type == POST_TYPES.USER:
-            return User
+            return UserModel
         elif related_type == POST_TYPES.TOPIC:
-            return Topic
+            return TopicModel
         elif related_type == POST_TYPES.COMMENT:
-            return Comment
+            return CommentModel
         elif related_type == POST_TYPES.BOARD:
-            return Board
+            return BoardModel
         elif related_type == POST_TYPES.MENTION:
             return Mention
         elif related_type == POST_TYPES.WIKI:
-            return WikiArticle
+            return WikiArticleModel
 
     @classmethod
     def get_post(cls, related_type, related_id) -> Optional['PostModel']:
-        from model.user import User
-        from model.topic import Topic
-        from model.wiki import WikiArticle
+        from model.user_model import UserModel
+        from model.topic_model import TopicModel
+        from model.wiki import WikiArticleModel
 
         if type(related_id) == POST_ID_GENERATOR:
             related_id = related_id.to_bin()
@@ -127,12 +129,18 @@ class POST_TYPES(StateObject):
         return ret
 
 
+def get_time():
+    return int(time.time())
+
+
 class PostModel(BaseModel):
     id = BlobField(primary_key=True, constraints=[SQL("DEFAULT int2bytea(nextval('id_gen_seq'))")])
     state = IntegerField(default=POST_STATE.NORMAL, index=True)
     visible = IntegerField(default=POST_VISIBLE.NORMAL, index=True)
-    time = MyTimestampField(index=True)  # 发布时间
+    time = MyTimestampField(index=True, default=get_time, help_text='发布时间')
     user_id = BlobField(index=True, null=True, default=None)  # 发布用户，对 user 表来说是推荐者，对 board 来说是创建者
+
+    # is_for_tests = BooleanField(default=False, help_text='单元测试标记，单元测试结束后删除')
 
     @classmethod
     @abstractmethod
@@ -147,9 +155,23 @@ class PostModel(BaseModel):
     def get_title(self):
         pass
 
+    @classmethod
+    def append_post_id(cls, values):
+        """
+        若有ID生成器，那么向values中添加生成出的值，若生成器为SQL Serial，则什么都不做
+        :param values:
+        :return:
+        """
+        if config.POST_ID_GENERATOR != config.SQLSerialGenerator:
+            values['id'] = config.POST_ID_GENERATOR().to_bin()
+
+
+def get_model_id():
+    return config.LONG_ID_GENERATOR().to_bin()
+
 
 class LongIdPostModel(PostModel):
-    id = BlobField(primary_key=True)
+    id = BlobField(primary_key=True, default=get_model_id)
 
     def get_title(self):
         """
@@ -158,8 +180,18 @@ class LongIdPostModel(PostModel):
         """
         return None
 
+    @classmethod
+    def append_post_id(cls, values):
+        """
+        若有ID生成器，那么向values中添加生成出的值，若生成器为SQL Serial，则什么都不做
+        :param values:
+        :return:
+        """
+        if config.LONG_ID_GENERATOR != config.SQLSerialGenerator:
+            values['id'] = config.LONG_ID_GENERATOR().to_bin()
 
-def get_title_by_record(post_type, record: DataRecord):
+
+def get_title_by_record(post_type, record: 'DataRecord'):
     """
     根据返回的 record 来获取title
     :param post_type:

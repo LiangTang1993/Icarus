@@ -6,7 +6,7 @@ from model._post import POST_STATE, POST_VISIBLE, PostModel, POST_TYPES
 from model.post_stats import post_stats_new
 from slim.utils import StateObject, get_bytes_from_blob
 from model import BaseModel, MyTimestampField, db
-from model.user import User
+from model.user_model import UserModel
 # from model.board import Board
 
 
@@ -31,7 +31,7 @@ DEFAULT_WIKI_CONTENT = '''
 '''
 
 
-class WikiArticle(PostModel):
+class WikiArticleModel(PostModel):
     title = TextField(index=True)
     content = TextField()
     ref = TextField(index=True, unique=True, null=True)

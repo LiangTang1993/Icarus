@@ -15,7 +15,7 @@ from slim.utils import to_hex, to_bin
 import config
 from model import db
 from model._post import POST_STATE
-from model.user import User
+from model.user_model import UserModel
 from model.user_oauth import UserOAuth
 from api.user import UserViewMixin
 
@@ -58,7 +58,7 @@ class UserOAuthView(UserViewMixin, PeeweeView):
 
             if account:
                 if account.user_id:  # 返回用户已有信息
-                    u = User.get_by_pk(account.user_id)
+                    u = UserModel.get_by_pk(account.user_id)
                     if u:
                         expires = 30
                         u.refresh_key()
@@ -71,7 +71,7 @@ class UserOAuthView(UserViewMixin, PeeweeView):
             else:
                 ins = [{'login_id': response['id'], 'time': time.time(), 'platform': 'github',
                         'state': POST_STATE.APPLY}]
-                if not isinstance(config.LONG_ID_GENERATOR, config.AutoGenerator):
+                if not isinstance(config.LONG_ID_GENERATOR, config.SQLSerialGenerator):
                     ins[0]['id'] = config.LONG_ID_GENERATOR().to_bin()
 
                 UserOAuth.insert_many(ins).execute()

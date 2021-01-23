@@ -1,6 +1,7 @@
 import { SlimSQLAPI, retcode } from 'slim-tools'
+import { SlimCrudAPI } from './crud'
 
-export class UserAPI extends SlimSQLAPI {
+export class UserAPI extends SlimCrudAPI {
   async signin ({ email, password }: any) {
     let ret = await this.request('/signin', 'POST', { data: { email, password } })
     if (ret.code === retcode.SUCCESS) {
@@ -9,14 +10,19 @@ export class UserAPI extends SlimSQLAPI {
     return ret
   }
 
+  /** 注册（直接形式，不开启邮件注册） */
+  async signupByDirect (email: string, password: string, nickname: string) {
+    return this.request('/signup_by_direct', 'POST', { data: { email, password, nickname } })
+  }
+
   // 准备进行邮件注册
-  async requestSignupByEmail (data: any) {
-    return this.request('/request_signup_by_email', 'POST', { data })
+  async signupRequestByEmail (data: any) {
+    return this.request('/signup_request_by_email', 'POST', { data })
   }
 
   // 拿到激活码，进行邮件注册
-  async signupByEmail (email: string, code: string) {
-    return this.request('/signup_by_email', 'POST', { data: { email, code } })
+  async signupConfirmByEmail (email: string, code: string) {
+    return this.request('/signup_confirm_by_email', 'POST', { data: { email, code } })
   }
 
   async checkIn () {
@@ -48,7 +54,7 @@ export class UserAPI extends SlimSQLAPI {
   }
 }
 
-export class NotifAPI extends SlimSQLAPI {
+export class NotifAPI extends SlimCrudAPI {
   async count () {
     return this.request('/count', 'GET')
   }
@@ -58,29 +64,42 @@ export class NotifAPI extends SlimSQLAPI {
   }
 }
 
-export class UploadAPI extends SlimSQLAPI {
-  async token (role: string, isAvatar: boolean) {
+export class UploadAPI extends SlimCrudAPI {
+  async qn_token (role: string, isAvatar: boolean) {
     const params: any = {}
     if (isAvatar) {
       params.is_avatar = isAvatar
     }
-    return this.request('/token', 'POST', { params, role })
+    return this.request('/qn_token', 'POST', { params, role })
+  }
+
+  async upload (file: File, role: string) {
+    let data = {
+      'file': file
+    }
+    return this.request('/upload', 'post', { data, role })
   }
 }
 
-export class WikiAPI extends SlimSQLAPI {
+export class WikiAPI extends SlimCrudAPI {
   async random () {
     return this.request('/random', 'GET')
   }
 }
 
-export class SearchAPI extends SlimSQLAPI {
+export class SearchAPI extends SlimCrudAPI {
   async random (keywords: Array<string>) {
     return this.request('/search', 'GET', { params: { keywords } })
   }
 }
 
-export class OAuthAPI extends SlimSQLAPI {
+export class MiscAPI extends SlimCrudAPI {
+  async info () {
+    return this.request('/info', 'GET')
+  }
+}
+
+export class OAuthAPI extends SlimCrudAPI {
   async getUrl (website: string) {
     return this.request('/get_oauth_url', 'GET', { params: { website } })
   }

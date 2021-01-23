@@ -4,13 +4,13 @@ import time
 import elasticsearch
 
 import config
-from model.comment import Comment
+from model.comment_model import CommentModel
 from slim.utils import to_hex
 
 from model._post import POST_TYPES, POST_STATE, POST_VISIBLE
-from model.topic import Topic
-from model.user import User
-from model.wiki import WikiArticle
+from model.topic_model import TopicModel
+from model.user_model import UserModel
+from model.wiki import WikiArticleModel
 
 INDEX_NAME = config.ES_INDEX_NAME
 if config.SEARCH_ENABLE:
@@ -72,7 +72,7 @@ def get_post_base_body(post):
         main_category = 'wiki'
 
     if post_type is POST_TYPES.COMMENT:
-        post: Comment
+        post: CommentModel
         if post.related_type in {POST_TYPES.TOPIC, POST_TYPES.BOARD}:
             main_category = 'forum'
         elif post_type in {POST_TYPES.WIKI, }:
@@ -95,9 +95,9 @@ def get_post_base_body(post):
 
 
 def es_update_topic(id):
-    post: Topic = Topic.get_by_id(id)
+    post: TopicModel = TopicModel.get_by_id(id)
     if not post: return
-    u: User = User.get_by_id(post.user_id)
+    u: UserModel = UserModel.get_by_id(post.user_id)
     if not u: return
 
     body = get_post_base_body(post)
@@ -115,10 +115,10 @@ def es_update_topic(id):
 
 
 def es_update_wiki(id):
-    post: WikiArticle = WikiArticle.get_by_id(id)
+    post: WikiArticleModel = WikiArticleModel.get_by_id(id)
     if not post: return
     if post.flag: return
-    u: User = User.get_by_id(post.user_id)
+    u: UserModel = UserModel.get_by_id(post.user_id)
     if not u: return
 
     body = get_post_base_body(post)
@@ -137,9 +137,9 @@ def es_update_wiki(id):
 
 
 def es_update_comment(id):
-    post: Comment = Comment.get_by_id(id)
+    post: CommentModel = CommentModel.get_by_id(id)
     if not post: return
-    u: User = User.get_by_id(post.user_id)
+    u: UserModel = UserModel.get_by_id(post.user_id)
     if not u: return
 
     p = POST_TYPES.get_post(post.related_type, post.related_id)
@@ -198,15 +198,15 @@ def update_all(reset=False):
             pass
         create_index()
 
-    for i in Topic.select(Topic.id):
+    for i in TopicModel.select(TopicModel.id):
         print('topic', to_hex(i.id))
         es_update_topic(i.id)
 
-    for i in WikiArticle.select(WikiArticle.id):
+    for i in WikiArticleModel.select(WikiArticleModel.id):
         print('wiki', to_hex(i.id))
         es_update_wiki(i.id)
 
-    for i in Comment.select(Comment.id):
+    for i in CommentModel.select(CommentModel.id):
         print('comment', to_hex(i.id))
         es_update_comment(i.id)
 

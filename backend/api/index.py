@@ -2,18 +2,18 @@ import time
 import config
 from app import app
 from lib.utils import get_today_start_timestamp
-from model.manage_log import MANAGE_OPERATION, ManageLog
-from model.notif import NOTIF_TYPE, Notification
+from model.manage_log import MANAGE_OPERATION, ManageLogModel
+from model.notif import NOTIF_TYPE, NotificationModel
 from model._post import POST_TYPES, POST_STATE, POST_VISIBLE
-from model.manage_log import ManageLog, MANAGE_OPERATION as MOP
+from model.manage_log import ManageLogModel, MANAGE_OPERATION as MOP
 from model.redis import RK_USER_ACTIVE_TIME_ZSET, redis, RK_USER_ANON_ACTIVE_TIME_ZSET
-from model.user import USER_GROUP
-from slim.base.view import BaseView
+from model.user_model import USER_GROUP
 from slim.ext.decorator import timer
 from slim.retcode import RETCODE
 from slim.utils import to_hex, get_bytes_from_blob
-from api.user import UserViewMixin
+from api.user_view_mixin import UserViewMixin
 # from api.ws import WSR
+from slim.view import BaseView
 
 '''
 @timer(10, exit_when=None)
@@ -26,11 +26,7 @@ async def user_online():
 
 @app.route.view('misc')
 class TestBaseView(UserViewMixin, BaseView):
-    @classmethod
-    def interface(cls):
-        cls.use('info', 'GET')
-        cls.use('tick', 'GET')
-
+    @app.route.get()
     async def tick(self):
         """
         定时轮询
@@ -43,8 +39,8 @@ class TestBaseView(UserViewMixin, BaseView):
             user = self.current_user
 
             # 检查未读信息
-            r = Notification.refresh(user.id)
-            c = Notification.count(user.id)
+            r = NotificationModel.refresh(user.id)
+            c = NotificationModel.count(user.id)
             data['notif_count'] = c
 
             # 更新在线时间
@@ -71,8 +67,12 @@ class TestBaseView(UserViewMixin, BaseView):
         data['online'] = await redis.zcount(RK_USER_ACTIVE_TIME_ZSET, min=now - offset) + \
                          await redis.zcount(RK_USER_ANON_ACTIVE_TIME_ZSET, min=now - offset)
 
-        self.finish(RETCODE.SUCCESS, data)
+        return {
+            'code': RETCODE.SUCCESS,
+            'data': data
+        }
 
+    @app.route.get()
     async def info(self):
         """
         一些后端信息，一般是首次打开页面时获得
@@ -149,4 +149,7 @@ class TestBaseView(UserViewMixin, BaseView):
                 'daily_reward': user.daily_access_reward()
             }
 
-        self.finish(RETCODE.SUCCESS, results)
+        return {
+            'code': RETCODE.SUCCESS,
+            'data': results
+        }

@@ -1,22 +1,76 @@
+import hashlib
 import json
+import os
 
+from aiohttp.web_request import FileField
+
+from api.view.curd import BaseCrudUserView
+from crud.schemas.upload import Upload
+from slim.ext.decorator import require_role
+
+import config
 from app import app
-from lib import qn
-from model.upload import Upload
-from model.user import User
-from slim.base.permission import Permissions
+from model.upload_model import UploadModel
+from model.user_model import UserModel
 from slim.retcode import RETCODE
-from slim.support.peewee import PeeweeView
-from slim.utils import binhex
-from api.user import UserViewMixin
+from slim.utils import binhex, CustomID
+
+
+upload_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', config.UPLOAD_DIR))
+os.makedirs(upload_dir, exist_ok=True)
 
 
 @app.route.view('upload')
-class UploadView(UserViewMixin, PeeweeView):
+class UploadView(BaseCrudUserView):
     model = Upload
 
     @app.route.interface('POST')
-    async def token(self):
+    # @require_role(USER_ROLE)
+    async def upload(self):
+        """
+        上传图片
+        随机文件名，上传至指定目录。完成后修改文件名为hash值
+        :return:
+        """
+        size = 0
+        cid = CustomID()
+        user: UserModel = self.current_user
+        fn = os.path.join(upload_dir, str(cid.to_hex()))
+        m = hashlib.blake2b()
+
+        post = await self.post_data()
+        field: FileField = post.get('file', None)
+
+        if not (field and isinstance(field, FileField)):
+            return self.finish(RETCODE.INVALID_POSTDATA, '没有提交 file 字段，或字段内容不是一个文件')
+
+        with open(fn, 'wb') as f:
+            while True:
+                chunk = field.file.read(8192)  # 8192 bytes by default.
+                if not chunk:
+                    break
+                size += len(chunk)
+                f.write(chunk)
+                m.update(chunk)
+
+        key = m.hexdigest()
+        if not UploadModel.get_by_key(key):
+            # 如果不存在，那么改名为hash值
+            os.rename(fn, os.path.join(upload_dir, key))
+        else:
+            # 如果已存在，那么删除
+            os.remove(fn)
+
+        upload = UploadModel.new_with_user(user.id, m.digest(), field.filename, size)
+        self.finish(RETCODE.SUCCESS, upload.to_dict())
+
+    @app.route.interface('POST')
+    async def qn_token(self):
+        """
+        获取七牛 token
+        :return:
+        """
+        from lib import qn
         user = self.current_user
         if user:
             if self.current_request_role in ('user', 'admin', 'superuser'):
@@ -26,6 +80,11 @@ class UploadView(UserViewMixin, PeeweeView):
 
     @app.route.interface('POST')
     async def qn_callback(self):
+        """
+        七牛回调
+        :return:
+        """
+        from lib import qn
         ua = self.headers.get('User-Agent', None)
         if not (ua and ua.startswith('qiniu-callback')):
             return self.finish(RETCODE.FAILED)
@@ -40,17 +99,13 @@ class UploadView(UserViewMixin, PeeweeView):
                 # 说明一下，这个哈希值不是base64 hex等编码，具体比较奇怪看了就知道了
                 # 总之因此直接使用了TextField来存放
                 key = info['key']
-                Upload.new(uid, key, info['size'], info['ext'], info['type_name'], info['image_info'])
+                UploadModel.new(uid, key, info['size'], info['ext'], info['type_name'], info['image_info'])
                 if info['type_name'] == 'avatar':
                     # 更换用户头像
-                    u = User.get_by_pk(uid)
+                    u = UserModel.get_by_pk(uid)
                     if u:
                         u.avatar = key
                         u.save()
                 return self.finish(RETCODE.SUCCESS, key)
 
         self.finish(RETCODE.FAILED)
-
-    @classmethod
-    def ready(cls):
-        pass

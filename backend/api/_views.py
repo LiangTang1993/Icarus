@@ -7,9 +7,9 @@ import api.statistic
 import api.notif
 import api.logs
 import api.upload
-import api.user_oauth
+# import api.user_oauth
 import api.wiki
-import api.search
-
-import api.ws
-import api.chat
+# import api.search
+#
+# import api.ws
+# import api.chat
